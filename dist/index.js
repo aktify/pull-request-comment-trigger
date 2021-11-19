@@ -6199,48 +6199,45 @@ async function run() {
         !context.payload.issue.pull_request
     ) {
         // not a pull-request comment, aborting
+        console.log("Not a PR or issue comment, aborting");
         core.setOutput("triggered", "false");
         return;
     }
-    console.log(context.payload);
+
+    console.log(JSON.stringify(context.payload.pull_request));
     const body =
         (context.eventName === "issue_comment"
             ? context.payload.comment.body
             : context.payload.pull_request.body || context.payload.pull_request.pull_request.body) || '';
     
-    console.log(body);
     core.setOutput('comment_body', body);
 
     const { owner, repo } = context.repo;
 
-
     const prefixOnly = core.getInput("prefix_only") === 'true';
-    if ((prefixOnly && !body.startsWith(trigger)) || (!prefixOnly && !body.includes(trigger))) {
-        core.setOutput("triggered", "false");
-        return;
-    }
-    console.log(trigger);
-    core.setOutput("triggered", "true");
+    const triggered = (prefixOnly && body.startsWith(trigger)) || (!prefixOnly && body.includes(trigger));
+    console.log(`body=${body}`);
+    console.log(`trigger=${trigger}`);
+    console.log(`body.includes(trigger)=${body.includes(trigger)}`);
+    core.setOutput("triggered", triggered);
 
-    if (!reaction) {
-        return;
-    }
-
-    const client = new GitHub(GITHUB_TOKEN);
-    if (context.eventName === "issue_comment") {
-        await client.reactions.createForIssueComment({
-            owner,
-            repo,
-            comment_id: context.payload.comment.id,
-            content: reaction
-        });
-    } else {
-        await client.reactions.createForIssue({
-            owner,
-            repo,
-            issue_number: context.payload.pull_request.number,
-            content: reaction
-        });
+    if (triggered && reaction) {
+        const client = new GitHub(GITHUB_TOKEN);
+        if (context.eventName === "issue_comment") {
+            await client.reactions.createForIssueComment({
+                owner,
+                repo,
+                comment_id: context.payload.comment.id,
+                content: reaction
+            });
+        } else {
+            await client.reactions.createForIssue({
+                owner,
+                repo,
+                issue_number: context.payload.pull_request.number,
+                content: reaction
+            });
+        }
     }
 }
 
